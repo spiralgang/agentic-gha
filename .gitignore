@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+fsm/_smoke.py
+*.log
