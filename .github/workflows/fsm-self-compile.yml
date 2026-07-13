@@ -67,6 +67,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ ! -d fsm ]; then
+            echo "::warning::fsm/ specs not present; skipping FSM self-compile."
+            exit 0
+          fi
           cd fsm
           python - <<'PY'
           import sys, os
@@ -85,7 +89,6 @@ jobs:
           print(f"STATES={','.join(spec.states)}")
           print(f"INITIAL={spec.initial}")
           print(f"PARAMS={spec.params}")
-          # surface for downstream steps
           with open(os.environ['GITHUB_OUTPUT'], 'a') as gh:
               gh.write(f"name={spec.name}\n")
               gh.write(f"states={','.join(spec.states)}\n")

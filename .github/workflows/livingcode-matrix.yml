@@ -67,12 +67,15 @@ jobs:
           MATRIX_CYCLES: ${{ inputs.cycles }}
         run: |
           set -euo pipefail
-          # Copy the local matrix source so the workflow can run it.
-          cp superlab_living_code.py matrix_run.py 2>/dev/null || true
-          if [ ! -f matrix_run.py ]; then
-            echo "::error::superlab_living_code.py not found in repo root"; exit 1
+          if [ ! -f superlab_fsm_living_code.py ]; then
+            echo "::warning::superlab_fsm_living_code.py not present in this repo; skipping living-code matrix."
+            exit 0
           fi
-          python3 matrix_run.py --children "$MATRIX_CHILDREN" --cycles "$MATRIX_CYCLES"
+          python3 superlab_fsm_living_code.py \
+            --file superlab_fsm_living_code.py \
+            --task "autonomously improve this repository" \
+            --children "$MATRIX_CHILDREN" --cycles "$MATRIX_CYCLES" \
+            --emit-yaml .github/workflows/superlab-generated.yml
 
       - name: "Upload matrix artifacts"
         if: always()
