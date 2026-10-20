@@ -39,19 +39,18 @@ runs:
     - name: "Resolve config from secrets or free model"
       id: cfg
       shell: bash
-      env:
-        SECRET_KEY: ${{ secrets.LLM_API_KEY }}
-        SECRET_BASE: ${{ secrets.LLM_BASE_URL }}
-        SECRET_MODEL: ${{ secrets.LLM_MODEL }}
       run: |
         set -euo pipefail
-        if [ -n "${SECRET_KEY:-}" ]; then
-          echo "key=${SECRET_KEY}" >> "$GITHUB_OUTPUT"
-          echo "base=${SECRET_BASE:-https://open.bigmodel.cn/api/paas/v4}" >> "$GITHUB_OUTPUT"
-          echo "model=${SECRET_MODEL:-glm-4-flash}" >> "$GITHUB_OUTPUT"
+        KEY="${LLM_API_KEY:-}"
+        BASE="${LLM_BASE_URL:-https://text.pollinations.ai}"
+        MODEL="${LLM_MODEL:-openai-fast}"
+        if [ -n "$KEY" ] && [ "$KEY" != "free" ]; then
+          echo "key=${KEY}" >> "$GITHUB_OUTPUT"
+          echo "base=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "model=${MODEL}" >> "$GITHUB_OUTPUT"
           echo "mode=secret" >> "$GITHUB_OUTPUT"
         else
-          echo "Notice: LLM_API_KEY secret not found. Routing to Free AI Model provider (pollinations/openai-fast)."
+          echo "Notice: Routing to Free AI Model provider (pollinations/openai-fast)."
           echo "key=" >> "$GITHUB_OUTPUT"
           echo "base=https://text.pollinations.ai" >> "$GITHUB_OUTPUT"
           echo "model=openai-fast" >> "$GITHUB_OUTPUT"
