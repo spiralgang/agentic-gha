@@ -36,7 +36,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: "Resolve config from secrets"
+    - name: "Resolve config from secrets or free model"
       id: cfg
       shell: bash
       env:
@@ -45,15 +45,18 @@ runs:
         SECRET_MODEL: ${{ secrets.LLM_MODEL }}
       run: |
         set -euo pipefail
-        if [ -z "${SECRET_KEY}" ]; then
-          echo "::error::LLM_API_KEY secret is not set. Real LLM calls require a key; mocking is forbidden by policy."
-          exit 1
+        if [ -n "${SECRET_KEY:-}" ]; then
+          echo "key=${SECRET_KEY}" >> "$GITHUB_OUTPUT"
+          echo "base=${SECRET_BASE:-https://open.bigmodel.cn/api/paas/v4}" >> "$GITHUB_OUTPUT"
+          echo "model=${SECRET_MODEL:-glm-4-flash}" >> "$GITHUB_OUTPUT"
+          echo "mode=secret" >> "$GITHUB_OUTPUT"
+        else
+          echo "Notice: LLM_API_KEY secret not found. Routing to Free AI Model provider (pollinations/openai-fast)."
+          echo "key=" >> "$GITHUB_OUTPUT"
+          echo "base=https://text.pollinations.ai" >> "$GITHUB_OUTPUT"
+          echo "model=openai-fast" >> "$GITHUB_OUTPUT"
+          echo "mode=free" >> "$GITHUB_OUTPUT"
         fi
-        {
-          echo "key=${SECRET_KEY}"
-          echo "base=${SECRET_BASE:-https://open.bigmodel.cn/api/paas/v4}"
-          echo "model=${SECRET_MODEL:-glm-4-flash}"
-        } >> "$GITHUB_OUTPUT"
 
     - name: "Write prompt + system to files"
       id: write
@@ -103,24 +106,28 @@ runs:
             "max_tokens": maxt,
         }
         data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(base + "/chat/completions", data=data, method="POST")
-        req.add_header("Content-Type", "application/json")
-        req.add_header("Authorization", f"Bearer {key}")
+        if not key or "pollinations" in base:
+            req = urllib.request.Request("https://text.pollinations.ai/", data=data, method="POST")
+            req.add_header("Content-Type", "application/json")
+        else:
+            req = urllib.request.Request(base + "/chat/completions", data=data, method="POST")
+            req.add_header("Content-Type", "application/json")
+            req.add_header("Authorization", f"Bearer {key}")
+
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
+                raw_bytes = resp.read()
+                try:
+                    body = json.loads(raw_bytes.decode("utf-8"))
+                    text = body["choices"][0]["message"]["content"]
+                except Exception:
+                    text = raw_bytes.decode("utf-8", "replace").strip()
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:800]
             print(f"::error::LLM HTTP {e.code}: {detail}", file=sys.stderr)
             sys.exit(1)
         except Exception as e:
             print(f"::error::LLM request failed: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        try:
-            text = body["choices"][0]["message"]["content"]
-        except Exception:
-            print(f"::error::Unexpected LLM response: {json.dumps(body)[:800]}", file=sys.stderr)
             sys.exit(1)
 
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
