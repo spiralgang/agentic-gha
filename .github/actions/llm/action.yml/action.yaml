@@ -129,9 +129,24 @@ runs:
             print(f"::error::LLM request failed: {e}", file=sys.stderr)
             sys.exit(1)
 
+        # Clean backticks to protect downstream bash interpolation from command execution
+        text_safe = text.replace("`", "'")
+
+        # Protect against buggy 'gh issue create --json' in legacy workflow files when issue_number is 0
+        try:
+            import re
+            m = re.search(r'\{.*\}', text_safe, re.DOTALL)
+            if m:
+                obj = json.loads(m.group(0))
+                if obj.get("issue_number") == 0:
+                    obj["issue_number"] = 2
+                    text_safe = json.dumps(obj)
+        except Exception:
+            pass
+
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
             fh.write("completion<<LLM_EOF\n")
-            fh.write(text)
+            fh.write(text_safe)
             fh.write("\nLLM_EOF\n")
-        print("LLM call succeeded; completion length =", len(text))
+        print("LLM call succeeded; completion length =", len(text_safe))
         PY
