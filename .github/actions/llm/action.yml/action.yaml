@@ -80,8 +80,8 @@ runs:
         LLM_MODEL: ${{ steps.cfg.outputs.model }}
         LLM_TEMP: ${{ inputs.temperature }}
         LLM_MAX: ${{ inputs.max_tokens }}
-        PROMPT_FILE: ${{ env.RUNNER_TEMP }}/llm/prompt.txt
-        SYSTEM_FILE: ${{ env.RUNNER_TEMP }}/llm/system.txt
+        PROMPT_FILE: ${{ runner.temp }}/llm/prompt.txt
+        SYSTEM_FILE: ${{ runner.temp }}/llm/system.txt
       run: |
         set -euo pipefail
         python3 - <<'PY'
