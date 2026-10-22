@@ -25,4 +25,7 @@ until attempt reaches max_fix, then force-approve.
 
 ## approve
 Approve and squash-merge the PR, close the issue. Increment cycle and, if
-cycle < max_cycles, return to examine to start a new task.
+cycle < max_cycles, return to examine to start a new task. If cycle >= max_cycles, move to evolve.
+
+## evolve
+Analyze the current FSM specifications in fsm/specs/. Identify the most consequential missing capability or improvement. Use the fsm.spec_updater to modify the markdown specs (PLANS.md, COPILOT_INSTRUCTIONS.md, AGENT_INSTRUCTIONS.md, or VAULT.md). Commit the changes as \"The Evolution App [Recursive Agent]\". This will trigger the fsm-self-compile workflow and update the machine's behavior. Reset cycle to 0 and return to examine.
