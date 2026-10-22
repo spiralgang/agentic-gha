@@ -9,6 +9,7 @@ Initial: examine
 - review : GLM reviews the PR and returns a verdict
 - fix : apply review fixes to the branch
 - approve : approve, merge, close, and loop
+- evolve : analyze the system and update its own specs
 
 ## Transitions
 - examine -> plan : True
@@ -19,3 +20,5 @@ Initial: examine
 - fix -> review : attempt < max_fix
 - fix -> approve : attempt >= max_fix
 - approve -> examine : cycle < max_cycles | cycle += 1
+- approve -> evolve : cycle >= max_cycles
+- evolve -> examine : True | cycle = 0
