@@ -1,5 +1,4 @@
 # FSM: RepoSDLC
-
 Initial: examine
 
 ## States
