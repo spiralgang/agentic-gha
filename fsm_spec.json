@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "states": {
+    "IDLE": { "next": "ANALYSIS" },
+    "ANALYSIS": { "next": "ACTION", "on_failure": "RECOVERY" },
+    "ACTION": { "next": "VERIFICATION", "on_failure": "RECOVERY" },
+    "VERIFICATION": { "next": "IDLE", "on_failure": "ANALYSIS" },
+    "RECOVERY": { "next": "ANALYSIS" }
+  },
+  "metadata": {
+    "evolution_count": 0,
+    "last_evolved": "2026-10-22"
+  }
+}
