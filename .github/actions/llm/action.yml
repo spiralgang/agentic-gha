@@ -1,0 +1,94 @@
+# =============================================================================
+# Composite action: real LLM call (OpenAI-compatible, free GLM-4-flash default)
+# -----------------------------------------------------------------------------
+# Composite actions cannot read the `secrets` context, so credentials come from
+# (1) the optional inputs below, or (2) env vars the calling workflow exports:
+#     LLM_API_KEY / ZHIPU_API_KEY, LLM_BASE_URL, LLM_MODEL
+# Callers: add at workflow level
+#   env:
+#     LLM_API_KEY: ${{ secrets.LLM_API_KEY || secrets.ZHIPU_API_KEY }}
+#     LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+#     LLM_MODEL: ${{ secrets.LLM_MODEL }}
+# and reference this action as `uses: ./.github/actions/llm` (a directory).
+# =============================================================================
+name: "Real LLM Call"
+description: "Call a real OpenAI-compatible model. Fails if no API key is available."
+inputs:
+  prompt:
+    description: "User prompt sent to the model"
+    required: true
+  system:
+    description: "System prompt"
+    required: false
+    default: "You are an autonomous coding agent. Reason step by step, then act."
+  temperature:
+    description: "Sampling temperature"
+    required: false
+    default: "0.4"
+  max_tokens:
+    description: "Max completion tokens"
+    required: false
+    default: "1500"
+  api_key:
+    description: "Optional API key (otherwise env LLM_API_KEY / ZHIPU_API_KEY)"
+    required: false
+    default: ""
+  base_url:
+    description: "Optional base URL (otherwise env LLM_BASE_URL, then Zhipu)"
+    required: false
+    default: ""
+  model:
+    description: "Optional model (otherwise env LLM_MODEL, then glm-4-flash)"
+    required: false
+    default: ""
+outputs:
+  completion:
+    description: "The raw model completion text"
+    value: ${{ steps.run.outputs.completion }}
+runs:
+  using: "composite"
+  steps:
+    - name: "Call the model (real request)"
+      id: run
+      shell: bash
+      env:
+        IN_KEY: ${{ inputs.api_key }}
+        IN_BASE: ${{ inputs.base_url }}
+        IN_MODEL: ${{ inputs.model }}
+        LLM_TEMP: ${{ inputs.temperature }}
+        LLM_MAX: ${{ inputs.max_tokens }}
+        LLM_PROMPT: ${{ inputs.prompt }}
+        LLM_SYSTEM: ${{ inputs.system }}
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import json, os, sys, urllib.request, urllib.error
+        env = os.environ.get
+        key = env("IN_KEY") or env("LLM_API_KEY") or env("ZHIPU_API_KEY") or ""
+        if not key:
+            print("::error::No LLM key: set secret LLM_API_KEY (or ZHIPU_API_KEY) and export it via workflow env.")
+            sys.exit(1)
+        base = (env("IN_BASE") or env("LLM_BASE_URL") or "https://open.bigmodel.cn/api/paas/v4").rstrip("/")
+        model = env("IN_MODEL") or env("LLM_MODEL") or "glm-4-flash"
+        try: temp = float(env("LLM_TEMP") or 0.4)
+        except ValueError: temp = 0.4
+        try: maxt = int(env("LLM_MAX") or 1500)
+        except ValueError: maxt = 1500
+        payload = {"model": model, "temperature": temp, "max_tokens": maxt,
+                   "messages": [{"role": "system", "content": (env("LLM_SYSTEM") or "").strip()},
+                                {"role": "user", "content": env("LLM_PROMPT") or ""}]}
+        req = urllib.request.Request(base + "/chat/completions", data=json.dumps(payload).encode(), method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("Authorization", f"Bearer {key}")
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            text = body["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as e:
+            print(f"::error::LLM HTTP {e.code}: {e.read().decode('utf-8','replace')[:800]}"); sys.exit(1)
+        except Exception as e:
+            print(f"::error::LLM request failed: {e}"); sys.exit(1)
+        with open(env("GITHUB_OUTPUT"), "a", encoding="utf-8") as fh:
+            fh.write("completion<<LLM_EOF_7f3a\n" + text + "\nLLM_EOF_7f3a\n")
+        print("LLM call succeeded; completion length =", len(text))
+        PY
